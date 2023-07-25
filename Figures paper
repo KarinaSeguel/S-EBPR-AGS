@@ -1,0 +1,168 @@
+title: "Sulfide-Thiosulfate"
+author: "Karina Seguel Suazo"
+date: "25 July 2023"
+
+##Project scope
+This material contains analysis of microbial community of 2 labscale reactorsoperated for 77 days,dataset using 16S rRNA amplicon sequencing data. 
+
+## Load packages 
+library(ampvis2)
+library(openxlsx)
+library(dplyr)
+library(dunn.test)
+library(data.table)
+library(vegan)
+library(ggplot2)
+library(forcats)
+library(dplyr)
+library(tidyverse)
+library(reshape2)
+library(ggpubr)
+
+
+#set working directory
+setwd(".../Seq_Data_2022")
+
+otu<-read.delim("otutab.txt")
+meta<-read.delim("Metadata_KS.txt")
+
+#Load data
+d <- amp_load(otutable = "otutab.txt",
+                taxonomy = "sintax_cleaned.txt",
+                metadata = "Metadata_KS.txt")
+
+dn <- amp_subset_samples(d, minreads = 10000, normalise = TRUE)
+dn
+
+#Subset data per reactor or sample type
+
+s<-amp_subset_samples(dn, Reactor_Name %in%c("Sulfide_1_2021"))
+t<-amp_subset_samples(dn, Reactor_Name %in%c("Thiosulphate_2_2021"))
+inoculum<-amp_subset_samples(dn, Day %in%c("0"))
+type<-amp_subset_samples(d, Type %in%c("Thiosulfate","Sulfide","Inoculum"))
+type2<-amp_subset_samples(d, Type %in%c("Thiosulfate","Sulfide"))
+
+
+##Figure 5
+
+#CCA plot
+cca<-amp_ordinate(
+  st,
+  filter_species = 0.1,
+  type = "CCA",
+  distmeasure = "bray",
+  transform = "hellinger",
+  constrain =  c("Sulfide","Thiosulfate"),
+  x_axis = 1,
+  y_axis = 2,
+  sample_color_by = c("Reactor"),
+  sample_colorframe_label_size = 3,
+  sample_label_by = "Day",
+  sample_label_size = 4,
+  sample_label_segment_color = "black",
+  sample_point_size = 2,
+  species_plot = T,
+  species_label_taxonomy = "Genus",
+  species_label_size = 0.5,
+  species_label_color = "grey10",
+  species_point_size = 0.5,
+  species_shape = 20,
+  envfit_numeric =c("Sulfide","Thiosulfate"),
+  envfit_signif_level = 0.005,
+  envfit_textsize = 4,
+  envfit_textcolor = "darkred",
+  envfit_numeric_arrows_scale = 1,
+  envfit_arrowcolor = "darkred",
+  envfit_show = TRUE,
+  repel_labels = TRUE,
+  opacity = 0.8,
+  tax_empty = "best"
+)+theme_bw() + theme(axis.text.y = element_text(size = 12, colour = "black"), 
+                     axis.text.x = element_text(size = 12, colour = "black", vjust = 1, hjust = 0.5, angle= 0))
+cca
+
+#Heatmaps
+sulf<-amp_heatmap(s,
+                 group_by = "Day",
+                 tax_aggregate = "Genus",
+                 tax_add = c("Phylum"),
+                 tax_show = 10,
+                 normalise = F,
+                 plot_na = FALSE,
+                plot_functions = F,
+                 plot_values_size = 4,
+                plot_colorscale= "sqrt",
+                plot_legendbreaks = c(1,10,20),
+)+theme_bw() + theme(axis.text.y = element_text(size = 12, colour = "black", face = "italic"), 
+                     axis.text.x = element_text(size = 12, colour = "black", vjust = 1, hjust = 0.5, angle= 0),
+                     legend.position = "none")+ggtitle("Sulfide")+ xlab(label = "Days of operation")
+
+thio<-amp_heatmap(t,
+                 group_by = "Day",
+                 tax_aggregate = "Genus",
+                 tax_add = c("Phylum"),
+                 tax_show = 10,
+                 normalise = F,
+                 plot_na = FALSE,
+                plot_functions = F,
+                plot_values_size = 4,
+                plot_colorscale= "sqrt",
+                plot_legendbreaks = c(1,10,20),
+)+theme_bw() + theme(axis.text.y = element_text(size = 12, colour = "black", face = "italic"), 
+                     axis.text.x = element_text(size = 12, colour = "black", vjust = 1, hjust = 0.5, angle= 0),
+                     legend.position = "right")+ggtitle("Thiosulfate")+xlab(label = "Days of operation")
+
+
+
+#Figure 5: Plot them together
+
+ggarrange(cca,                                                 # First row with CCA plot
+          ggarrange(sulf, thio, ncol = 2, labels = c("B)", "C)"),align = "hv",widths = c(0.45,0.55)), # Second row with heatmaps
+          nrow = 2, align = "h",
+          labels = c("A)  "),hjust = 0                                        # Labels of the CCA plot
+          )
+
+
+##Alphadiversity analysis
+
+alphadiversityresult <- amp_alphadiv(
+  st,
+  measure = c("shannon", "simpson"),
+  richness = T,
+  rarefy = NULL
+)
+
+write.table(alphadiversityresult, file = "AlphaDiversity.txt",
+            sep = "\t", dec = ",",
+            row.names = TRUE)
+
+##Venn diagram
+#Including only enriched sulfide and thiosulfate samples
+t1<-amp_venn(
+  type2,
+  group_by = "Type",
+  cut_a = 0.1,
+  cut_f = 80,
+  text_size = 5,
+  normalise = T,
+  detailed_output = F
+)
+t1
+
+#including inoculum, enriched sulfide and thiosulfate samples
+
+t2<-amp_venn(
+  type,
+  group_by = "Type",
+  cut_a = 0.1,
+  cut_f = 80,
+  text_size = 5,
+  normalise = T,
+  detailed_output = F
+) + scale_color_brewer(palette = "Paired")
+
+t2
+
+#Plot Venn diagram
+ggarrange(t1,t2,labels = c("A)","B)"),ncol = 2,nrow = 1,widths = c(0.45,0.55))
+ggsave("Venn.png",width = 12,height=6, dpi = 400)
