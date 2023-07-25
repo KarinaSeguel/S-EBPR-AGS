@@ -136,7 +136,35 @@ write.table(alphadiversityresult, file = "AlphaDiversity.txt",
             sep = "\t", dec = ",",
             row.names = TRUE)
 
-##Venn diagram
+##Supplementary figures
+#Figure S2: Family and genus 
+i<-amp_heatmap(inoculum,
+                 group_by = "Day",facet_by = "Type",
+                 tax_aggregate = "Family",
+                 tax_show = 10,
+                 normalise = F,
+                 plot_na = FALSE,                plot_colorscale= "sqrt",
+                plot_legendbreaks = c(1,5,10),
+                plot_functions = F
+)+theme(legend.position = "right")
+
+i1<-amp_heatmap(inoculum,
+                 group_by = "Day",facet_by = "Type",
+                 tax_aggregate = c("Family","Genus"),
+                 tax_show = 10,
+                 normalise = F,
+                 plot_na = FALSE,                plot_colorscale= "sqrt",
+                plot_legendbreaks = c(0.1,2.5,5),
+                plot_functions = F
+)+theme(legend.position = "right")
+
+
+
+ggarrange(i, i1, labels = c("A)", "B)"), ncol = 2, nrow = 1)
+ggsave("S-T_Family.png",width = 10,height = 5,dpi = 300)
+
+
+#Figure S3: Venn diagram
 #Including only enriched sulfide and thiosulfate samples
 t1<-amp_venn(
   type2,
@@ -166,3 +194,56 @@ t2
 #Plot Venn diagram
 ggarrange(t1,t2,labels = c("A)","B)"),ncol = 2,nrow = 1,widths = c(0.45,0.55))
 ggsave("Venn.png",width = 12,height=6, dpi = 400)
+
+#Figure S4:SOB-SRB
+
+sob <- amp_subset_taxa(st,
+                       normalise=FALSE,
+                       tax_vector=c("Thermothrix","Thioalkalivibrio","Thioalkalispira","Thiomicrospira","Thiovulum","Thiothrix",
+       "Thioplaca","Achromatium","Thiomicrospira","Acidithiobacillus", "Thiosphaera",
+       "Beggiatoa","Thiomargarita","Thioploca","Sulfurimonas","Thiobacillus"))
+
+
+srb<-amp_subset_taxa(st,
+                       normalise=FALSE,
+                       tax_vector=c("Desulfovibrio","Desulfomicrobium","Desulfohalobium","Desulfonatronum","Desulfobotulus",
+      "Desulfocella","Desulfofaba","Desulforegula","Desulfobulbus","Desulfocapsa","Desulfofustis",
+      "Desulforhopalus","Desulfotalea","Thermodesulfobacterium","Thermodesulfovibrio","Desulfosporosinus",
+      "Desulfotomaculum","Desulfomonile","Desulfobacter","Desulfuromonas"))
+
+
+o <-amp_heatmap(sob,
+                 group_by = "Day",
+               facet_by = "Reactor",
+                 tax_aggregate = "Genus",
+                 tax_add = c("Phylum"),
+                 tax_show = 10,
+               min_abundance = 0.01,round = 1,
+                 normalise = F,
+                 plot_na = FALSE,
+                 
+) +
+  theme(axis.text.x = element_text(angle = 45, size=10, vjust = 1),
+        axis.text.y = element_text(size=10),
+        legend.position="right")+ggtitle("SOB")
+
+r<-amp_heatmap(srb,
+                 group_by = "Day",
+               facet_by = "Reactor",
+                 tax_aggregate = "Genus",
+                 tax_add = c("Phylum"),
+                 tax_show = 10,
+               min_abundance = 0.01,round = 2,
+                 normalise = F,
+                 plot_na = FALSE,
+                 
+) +
+  theme(axis.text.x = element_text(angle = 45, size=10, vjust = 1),
+        axis.text.y = element_text(size=10),
+        legend.position="right")+ggtitle("SRB")
+
+
+
+ggarrange(o,r,labels = c("A)","B)"),ncol = 1,nrow = 2)
+
+ggsave("SOB-SRB.png",width = 15,height = 4,dpi=300)
