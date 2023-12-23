@@ -1,9 +1,9 @@
 title: "Sulfide-Thiosulfate"
 author: "Karina Seguel Suazo"
-date: "25 July 2023"
+date: "22 December 2023"
 
 ##Project scope
-This material contains analysis of microbial community of 2 labscale reactorsoperated for 77 days,dataset using 16S rRNA amplicon sequencing data. 
+This material contains analysis of microbial community of 2 labscale reactorsoperated for 80 days,dataset using 16S rRNA amplicon sequencing data. 
 
 ## Load packages 
 library(ampvis2)
@@ -23,12 +23,12 @@ library(ggpubr)
 #set working directory
 setwd(".../Seq_Data_2022")
 
-otu<-read.delim("otutab.txt")
+#Load datasets
 meta<-read.delim("Metadata_KS.txt")
+otu<-read_tsv("ASVtable.tsv")
 
-#Load data
-d <- amp_load(otutable = "otutab.txt",
-                taxonomy = "sintax_cleaned.txt",
+d <- amp_load(otutable = otu,
+                taxonomy = "ASVs.R1.sintax",
                 metadata = "Metadata_KS.txt")
 
 dn <- amp_subset_samples(d, minreads = 10000, normalise = TRUE)
@@ -44,8 +44,84 @@ type2<-amp_subset_samples(d, Type %in%c("Thiosulfate","Sulfide"))
 
 
 ##Figure 5
+#A) and B) heatmaps
 
-#CCA plot
+sulf<-amp_heatmap(s,
+                 group_by = "Day",
+                 tax_aggregate = "Genus",
+                 tax_add = c("Phylum"),
+                 tax_show = 10,
+                 normalise = F,
+                 plot_na = FALSE,
+                plot_functions = F,
+                 plot_values_size = 4,
+                plot_colorscale= "sqrt",
+                plot_legendbreaks = c(1,5,15),
+)+theme_bw() + theme(axis.text.y = element_text(size = 12, colour = "black", face = "italic"), 
+                     axis.text.x = element_text(size = 12, colour = "black", vjust = 1, hjust = 0.5, angle= 0),
+                     legend.position = "none",panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, size = 1),plot.title = element_text(hjust = 0.5))+ggtitle("Sulfide")+ xlab(label = "Days of operation")
+
+sulf
+thio<-amp_heatmap(t,
+                 group_by = "Day",
+                 tax_aggregate = "Genus",
+                 tax_add = c("Phylum"),
+                 tax_show = 10,
+                 normalise = F,
+                 plot_na = FALSE,
+                plot_functions = F,
+                plot_values_size = 4,
+                plot_colorscale= "sqrt",
+                plot_legendbreaks = c(1,5,15),
+)+theme_bw() + theme(axis.text.y = element_text(size = 12, colour = "black", face = "italic"), 
+                     axis.text.x = element_text(size = 12, colour = "black", vjust = 1, hjust = 0.5, angle= 0),
+                     legend.position = "right",panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+    plot.title = element_text(hjust = 0.5))+ggtitle("Thiosulfate")+xlab(label = "Days of operation")
+
+thio
+# C)
+# Install and load necessary packages
+top20<-amp_heatmap(dn,
+                 group_by = "Sample_Name",
+                 tax_aggregate = "Genus",
+                 tax_show = 20,
+                 normalise = F,
+textmap = T)
+
+bacterial_genera<- data.frame(t(top20))
+
+environmental_factors <-dn[["metadata"]]
+env_factors<-select(environmental_factors,c("Thiosulfate","Sulfide"))#,"SVI10_SVI","SVI","Dv50","RS")) #"SVI5","SVI","Dv50
+
+# Columns to convert to numeric (Because R sees "," as character)
+#numeric_columns <- c("Dv50") #, "SVI10_SVI", "SVI", "Dv50"
+
+# Remove commas and convert to numeric for each specified column
+#env_factors[numeric_columns] <- lapply(env_factors[numeric_columns], function(x) as.numeric(gsub(",", "", x)))
+
+# Print the modified data frame
+print(env_factors)
+
+# Perform correlation analysis
+cor_results <- rcorr(as.matrix(cbind(bacterial_genera)))
+
+# Extract correlation coefficients and p-values
+cor_matrix <- cor_results$r
+p_values <- cor_results$P
+
+# Create a matrix of NA values for insignificant correlations
+cor_matrix[p_values > 0.05] <- NA
+
+# Plot the heatmap
+corrplot(cor_matrix, method = "circle", p.mat = p_values, sig.level = 0.05, insig = "blank",tl.col = 'black',tl.pos = "l", type = 'lower',diag=T)
+
+
+#D) CCA plot
+
 cca<-amp_ordinate(
   st,
   filter_species = 0.1,
@@ -78,172 +154,319 @@ cca<-amp_ordinate(
   opacity = 0.8,
   tax_empty = "best"
 )+theme_bw() + theme(axis.text.y = element_text(size = 12, colour = "black"), 
-                     axis.text.x = element_text(size = 12, colour = "black", vjust = 1, hjust = 0.5, angle= 0))
-cca
+                     axis.text.x = element_text(size = 12, colour = "black",
+                                                vjust = 1, hjust = 0.5, angle= 0))+
 
-#Heatmaps
-sulf<-amp_heatmap(s,
-                 group_by = "Day",
-                 tax_aggregate = "Genus",
-                 tax_add = c("Phylum"),
-                 tax_show = 10,
-                 normalise = F,
-                 plot_na = FALSE,
-                plot_functions = F,
-                 plot_values_size = 4,
-                plot_colorscale= "sqrt",
-                plot_legendbreaks = c(1,10,20),
-)+theme_bw() + theme(axis.text.y = element_text(size = 12, colour = "black", face = "italic"), 
-                     axis.text.x = element_text(size = 12, colour = "black", vjust = 1, hjust = 0.5, angle= 0),
-                     legend.position = "none")+ggtitle("Sulfide")+ xlab(label = "Days of operation")
+  # Adjust X and Y axis limits
+  scale_x_continuous(limits = c(-3, 3)) +
+  scale_y_continuous(limits = c(-3, 3))
+    
 
-thio<-amp_heatmap(t,
-                 group_by = "Day",
-                 tax_aggregate = "Genus",
-                 tax_add = c("Phylum"),
-                 tax_show = 10,
-                 normalise = F,
-                 plot_na = FALSE,
-                plot_functions = F,
-                plot_values_size = 4,
-                plot_colorscale= "sqrt",
-                plot_legendbreaks = c(1,10,20),
-)+theme_bw() + theme(axis.text.y = element_text(size = 12, colour = "black", face = "italic"), 
-                     axis.text.x = element_text(size = 12, colour = "black", vjust = 1, hjust = 0.5, angle= 0),
-                     legend.position = "right")+ggtitle("Thiosulfate")+xlab(label = "Days of operation")
+cca2<- cca+geom_vline(xintercept = 0, linetype = "dotted", color = "black", size = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dotted", color = "black", size = 0.5) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, size = 1)
+  ) 
 
+cca2
 
+Figure 6. A) Core community and B) Barchart
 
-#Figure 5: Plot them together
+# Select Core community of dataset containing only samples from last days.
 
-ggarrange(cca,                                                 # First row with CCA plot
-          ggarrange(sulf, thio, ncol = 2, labels = c("B)", "C)"),align = "hv",widths = c(0.45,0.55)), # Second row with heatmaps
-          nrow = 2, align = "h",
-          labels = c("A)  "),hjust = 0                                        # Labels of the CCA plot
-          )
-
-
-##Alphadiversity analysis
-
-alphadiversityresult <- amp_alphadiv(
-  st,
-  measure = c("shannon", "simpson"),
-  richness = T,
-  rarefy = NULL
-)
-
-write.table(alphadiversityresult, file = "AlphaDiversity.txt",
-            sep = "\t", dec = ",",
-            row.names = TRUE)
-
-##Supplementary figures
-#Figure S2: Family and genus 
-i<-amp_heatmap(inoculum,
-                 group_by = "Day",facet_by = "Type",
-                 tax_aggregate = "Family",
-                 tax_show = 10,
-                 normalise = F,
-                 plot_na = FALSE,                plot_colorscale= "sqrt",
-                plot_legendbreaks = c(1,5,10),
-                plot_functions = F
-)+theme(legend.position = "right")
-
-i1<-amp_heatmap(inoculum,
-                 group_by = "Day",facet_by = "Type",
-                 tax_aggregate = c("Family","Genus"),
-                 tax_show = 10,
-                 normalise = F,
-                 plot_na = FALSE,                plot_colorscale= "sqrt",
-                plot_legendbreaks = c(0.1,2.5,5),
-                plot_functions = F
-)+theme(legend.position = "right")
-
-
-
-ggarrange(i, i1, labels = c("A)", "B)"), ncol = 2, nrow = 1)
-ggsave("S-T_Family.png",width = 10,height = 5,dpi = 300)
-
-
-#Figure S3: Venn diagram
-#Including only enriched sulfide and thiosulfate samples
-t1<-amp_venn(
+t2<-amp_venn(
   type2,
   group_by = "Type",
   cut_a = 0.1,
   cut_f = 80,
   text_size = 5,
   normalise = T,
-  detailed_output = F
+  detailed_output = T
 )
-t1
 
-#including inoculum, enriched sulfide and thiosulfate samples
+table<-t2[["Otutable"]]
 
-t2<-amp_venn(
-  type,
-  group_by = "Type",
-  cut_a = 0.1,
-  cut_f = 80,
-  text_size = 5,
-  normalise = T,
-  detailed_output = F
-) + scale_color_brewer(palette = "Paired")
+#Extract only Core OTUs and genus 
+df<-select(table,c("SW112021A","TW112021B","Shared","OTU","Genus"))
+df2<-df%>%filter(Shared=="Core")%>%select("SW112021A","TW112021B","OTU","Genus")
+df2
 
-t2
+# Rename columns
+df3 <- df2 %>%
+  rename(Sulfide = SW112021A, Thiosulfate = TW112021B)
 
-#Plot Venn diagram
-ggarrange(t1,t2,labels = c("A)","B)"),ncol = 2,nrow = 1,widths = c(0.45,0.55))
-ggsave("Venn.png",width = 12,height=6, dpi = 400)
+# Replace blank cell with "no classification"
+df3$Genus <- ifelse(df2$Genus == "", "No classification", df3$Genus)
 
-#Figure S4:SOB-SRB
+# Remove "g__" from each element in the "Genus" column
+df3$Genus <- sub("^g__", "", df3$Genus)
 
-sob <- amp_subset_taxa(st,
-                       normalise=FALSE,
-                       tax_vector=c("Thermothrix","Thioalkalivibrio","Thioalkalispira","Thiomicrospira","Thiovulum","Thiothrix",
-       "Thioplaca","Achromatium","Thiomicrospira","Acidithiobacillus", "Thiosphaera",
-       "Beggiatoa","Thiomargarita","Thioploca","Sulfurimonas","Thiobacillus"))
+#Replace Ca_ for Ca.
+df3$Genus <- sub("^Ca_", "Ca. ", df3$Genus)
+
+#Select only sulide, thiosulfate and Genus
+df3<-df3%>%select(Sulfide,Thiosulfate,Genus)
+
+df4 <- df3 %>%
+  group_by(Genus) %>%
+  summarize(
+    Sulfide = sum(Sulfide),
+    Thiosulfate = sum(Thiosulfate)
+  )
+
+# Convert to a long format for ggplot2
+df2_long <- tidyr::pivot_longer(df4, cols = c("Sulfide", "Thiosulfate"), names_to = "Sample", values_to = "Value")
+#Plot
+core_plot <- ggplot(df2_long, aes(x = Genus, y = Value, fill = Sample)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+   scale_y_continuous(limits = c(0, 20), expand = c(0, 0)) +
+  theme_minimal() +
+  scale_fill_manual(values = c("SBR-S" = brewer.pal(12, "Set3")[1], "SBR-T" = brewer.pal(12, "Set3")[2])) +  # Set3 colors+
+  scale_fill_brewer(palette = "Set3") +  # Change the color palette
+  labs(x = "", y = "Relative abundance %", fill = "Sample") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+    legend.position = "right",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+     axis.ticks.y = element_line(color = "black"),
+    axis.line = element_line(colour = "black"),
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    plot.title = element_text(size = 10,face = "plain")
+  )
+
+# Print the plot
+print(core_plot)
+
+ ## Figure6.B Barchart top 4 microorganisms
+#Sulfide reactor
+df <-amp_subset_taxa(s, tax_vector = c("g__Ca_Competibacter","g__Ca_Accumulibacter","g__Dechloromonas","g__Thiothrix"),normalise = F)
 
 
-srb<-amp_subset_taxa(st,
-                       normalise=FALSE,
-                       tax_vector=c("Desulfovibrio","Desulfomicrobium","Desulfohalobium","Desulfonatronum","Desulfobotulus",
-      "Desulfocella","Desulfofaba","Desulforegula","Desulfobulbus","Desulfocapsa","Desulfofustis",
-      "Desulforhopalus","Desulfotalea","Thermodesulfobacterium","Thermodesulfovibrio","Desulfosporosinus",
-      "Desulfotomaculum","Desulfomonile","Desulfobacter","Desulfuromonas"))
-
-
-o <-amp_heatmap(sob,
-                 group_by = "Day",
-               facet_by = "Reactor",
+bacteria_df <- amp_heatmap(df,
+            group_by = "Day",
                  tax_aggregate = "Genus",
                  tax_add = c("Phylum"),
                  tax_show = 10,
-               min_abundance = 0.01,round = 1,
-                 normalise = F,
-                 plot_na = FALSE,
+                 normalise = FALSE,
+                 plot_na = FALSE,min_abundance = 0.01,textmap = T
                  
-) +
-  theme(axis.text.x = element_text(angle = 45, size=10, vjust = 1),
-        axis.text.y = element_text(size=10),
-        legend.position="right")+ggtitle("SOB")
+) 
 
-r<-amp_heatmap(srb,
-                 group_by = "Day",
-               facet_by = "Reactor",
+
+# Save row names as a column 'Bacteria'
+bacteria_df <- bacteria_df %>%
+  rownames_to_column(var = "Bacteria")
+
+
+# Select only numeric columns
+numeric_columns <- bacteria_df %>%
+  select_if(is.numeric)
+
+# Calculate the sum of each column for the "Other" row
+other_row <- numeric_columns %>%
+  summarise(across(everything(), sum, na.rm = TRUE))
+
+# Calculate the remaining value to make the total 100
+remaining_value <- 100 - other_row
+# Bind the new row to the dataframe
+bacteria_df <- bind_rows(bacteria_df, remaining_value)
+
+# Create the "Other" row with character values
+bacteria_df <- bacteria_df %>%
+  mutate(Bacteria = ifelse(is.na(Bacteria), "Other", Bacteria))
+
+# Reshape the data to long format for better plotting
+bacteria_long <- bacteria_df %>%
+  pivot_longer(cols = -Bacteria, names_to = "Day", values_to = "Abundance") %>%
+  mutate(Day = as.factor(gsub("X", "", Day)),  # Extract the numeric part of column names
+         Bacteria = as.factor(Bacteria),
+         Abundance = as.numeric(Abundance)) %>%
+  arrange(Day, Bacteria)
+
+# Convert 'Day' to numeric
+bacteria_long$Day <- as.numeric(as.character(bacteria_long$Day))
+
+
+bacteria_long <- bacteria_long %>%
+  mutate(Bacteria = case_when(
+    Bacteria == "Proteobacteria; Ca_Competibacter" ~ "Ca. Competibacter",
+    Bacteria == "Proteobacteria; Thiothrix" ~ "Thiothrix",
+    Bacteria == "Proteobacteria; Ca_Accumulibacter" ~ "Ca. Accumulibacter",
+    Bacteria == "Proteobacteria; Dechloromonas" ~ "Dechloromonas",
+    TRUE ~ as.character(Bacteria)  # Keep other values unchanged
+  ))
+# Convert 'Bacteria' to a factor with desired levels
+bacteria_long$Bacteria <- factor(bacteria_long$Bacteria,
+                                  levels = c("Ca. Competibacter", "Thiothrix", "Ca. Accumulibacter", "Dechloromonas", "Other"))
+
+# Manually specify the order of days
+custom_order <- c("0", "7", "14", "21", "28", "35", "42", "49", "56", "63", "70", "77", "80")  # Add or remove days as needed
+
+# Convert "Day" to factor with custom order
+bacteria_long$Day <- factor(bacteria_long$Day, levels = custom_order)
+
+# Calculate the bar width based on the number of unique days
+bar_width <- 0.8 / length(unique(bacteria_long$Day))
+
+bar_S<- ggplot(bacteria_long, aes(x = Day, y = Abundance, fill = Bacteria)) +
+    geom_bar(stat = "identity",position = "stack") +
+  labs(title = "SBR-S",
+       x = "Day",
+       y = "Read abundance %") +
+  scale_fill_manual(values = c("Ca. Competibacter" = "#92c5de",
+                               "Thiothrix" = "#a1d99b",
+                               "Ca. Accumulibacter" = "#e41a1c",
+                               "Dechloromonas" = "#bdbdbd",
+                               "Other" = "#9e9ac8")) +
+  scale_y_continuous(limits = c(0, 100), expand = c(0, 0)) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(color = "black", size = 10),
+        axis.text.y = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 12),
+        axis.line.y = element_line(color = "black"),
+        axis.ticks.y = element_line(color = "black"),
+        plot.title = element_text(size = 14),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 10),
+        panel.grid = element_blank())
+bar_S
+
+##For thiosulfate reactor
+df_t <-amp_subset_taxa(t, tax_vector = c("g__Ca_Competibacter","g__Ca_Accumulibacter","g__Dechloromonas","g__Thiothrix"),normalise = F)
+
+
+bacteria_df_t <- amp_heatmap(df_t,
+            group_by = "Day",
                  tax_aggregate = "Genus",
                  tax_add = c("Phylum"),
                  tax_show = 10,
-               min_abundance = 0.01,round = 2,
-                 normalise = F,
-                 plot_na = FALSE,
+                 normalise = FALSE,
+                 plot_na = FALSE,min_abundance = 0.01,textmap = T
                  
-) +
-  theme(axis.text.x = element_text(angle = 45, size=10, vjust = 1),
+) 
+
+# Save row names as a column 'Bacteria'
+bacteria_df_t <- bacteria_df_t %>%
+  rownames_to_column(var = "Bacteria")
+
+# Select only numeric columns
+numeric_columns_t <- bacteria_df_t %>%
+  select_if(is.numeric)
+
+# Calculate the sum of each column for the "Other" row
+other_row_t <- numeric_columns_t %>%
+  summarise(across(everything(), sum, na.rm = TRUE))
+
+# Calculate the remaining value to make the total 100
+remaining_value_t <- 100 - other_row_t
+# Bind the new row to the dataframe
+bacteria_df_t <- bind_rows(bacteria_df_t, remaining_value_t)
+
+# Create the "Other" row with character values
+bacteria_df_t <- bacteria_df_t %>%
+  mutate(Bacteria = ifelse(is.na(Bacteria), "Other", Bacteria))
+# Reshape the data to long format for better plotting
+bacteria_long_t <- bacteria_df_t %>%
+  pivot_longer(cols = -Bacteria, names_to = "Day", values_to = "Abundance") %>% mutate(Day = as.factor(gsub("X", "", Day)),  # Extract the numeric part of column names
+         Bacteria = as.factor(Bacteria),
+         Abundance = as.numeric(Abundance)) %>%
+  arrange(Day, Bacteria)
+
+# Convert 'Day' to numeric
+bacteria_long_t$Day <- as.numeric(as.character(bacteria_long_t$Day))
+
+
+bacteria_long_t <- bacteria_long_t %>%
+  mutate(Bacteria = case_when(
+    Bacteria == "Proteobacteria; Ca_Competibacter" ~ "Ca. Competibacter",
+    Bacteria == "Proteobacteria; Thiothrix" ~ "Thiothrix",
+    Bacteria == "Proteobacteria; Ca_Accumulibacter" ~ "Ca. Accumulibacter",
+    Bacteria == "Proteobacteria; Dechloromonas" ~ "Dechloromonas",
+    TRUE ~ as.character(Bacteria)  # Keep other values unchanged
+  ))
+
+
+# Convert 'Bacteria' to a factor with desired levels
+bacteria_long_t$Bacteria <- factor(bacteria_long_t$Bacteria,
+                                  levels = c("Ca. Competibacter", "Thiothrix", "Ca. Accumulibacter", "Dechloromonas", "Other"))
+
+
+# Manually specify the order of days
+custom_order <- c("0", "7", "14", "21", "28", "35", "42", "49", "56", "63", "70", "77", "80")  # Add or remove days as needed
+
+# Convert "Day" to factor with custom order
+bacteria_long_t$Day <- factor(bacteria_long_t$Day, levels = custom_order)
+
+
+# Calculate the bar width based on the number of unique days
+bar_width <- 0.8 / length(unique(bacteria_long_t$Day))
+
+bar_T<- ggplot(bacteria_long_t, aes(x = Day, y = Abundance, fill = Bacteria)) +
+    geom_bar(stat = "identity",position = "stack") +
+  labs(title = "SBR-T",
+       x = "Day",
+       y = "Read abundance %") +
+  scale_fill_manual(values = c("Ca. Competibacter" = "#92c5de",
+                               "Thiothrix" = "#a1d99b",
+                               "Ca. Accumulibacter" = "#e41a1c",
+                               "Dechloromonas" = "#bdbdbd",
+                               "Other" = "#9e9ac8")) +
+  scale_y_continuous(limits = c(0, 100), expand = c(0, 0)) +
+  theme_minimal() +
+  theme(legend.position = "right",
+        axis.text.x = element_text(color = "black", size = 10),
+        axis.text.y = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 12),
+        axis.line.y = element_line(color = "black"),
+        axis.ticks.y = element_line(color = "black"),
+        plot.title = element_text(size = 14),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 10),
+        panel.grid = element_blank())
+
+bar_T
+
+ggarrange(bar_S,bar_T,labels = c("A)", "B)"), ncol = 2, nrow = 1, widths = c(0.45, 0.65))
+
+
+
+##Figure 7. Alpha diversity analysis
+
+alphadiversityresult <- amp_alphadiv(st_d,
+  measure = c("shannon", "simpson"),richness = T,
+  rarefy = NULL
+)
+
+#write.table(alphadiversityresult, file = "AlphaDiversity.txt",
+        #    sep = "\t", dec = ",",
+         #   row.names = TRUE)
+
+
+s<-alphadiversityresult%>%filter(Reactor%in%c("SBR-S"))
+t<-alphadiversityresult%>%filter(Reactor%in%c("SBR-T"))
+
+a<-ggplot(s,aes(x=Day,y=Chao1))+geom_point()+theme_bw()+theme(axis.title.x = element_blank(),axis.text.x = element_text(size=10, vjust = 1),
         axis.text.y = element_text(size=10),
-        legend.position="right")+ggtitle("SRB")
+        panel.grid = element_blank(),axis.title.y = element_text(size=10))+ggtitle("SBR-S")+scale_y_continuous(limits = c(min=1500,max=2500))+theme( plot.title = element_text(hjust = 0.5, vjust = 0.5, size = 12))
 
 
+b<-ggplot(t,aes(x=Day,y=Chao1))+geom_point()+theme_bw()+theme(axis.title.x = element_blank(),axis.text.x = element_text(size=10, vjust = 1),
+        axis.text.y = element_text(size=10),panel.grid = element_blank(),axis.title.y = element_blank())+ggtitle("SBR-T")+scale_y_continuous(limits = c(min=1500,max=2500))+theme( plot.title = element_text(hjust = 0.5, vjust = 0.5, size = 12))
 
-ggarrange(o,r,labels = c("A)","B)"),ncol = 1,nrow = 2)
+c<-ggplot(s,aes(x=Day,y=Shannon))+geom_point()+theme_bw()+theme(axis.text.x = element_text(size=10, vjust = 1),
+        axis.text.y = element_text(size=10),panel.grid = element_blank())+scale_y_continuous(limits = c(min=4.5,max=6.5))
 
-ggsave("SOB-SRB.png",width = 15,height = 4,dpi=300)
+d<-ggplot(t,aes(x=Day,y=Shannon))+geom_point()+theme_bw()+theme(axis.text.x = element_text(size=10, vjust = 1),
+        axis.text.y = element_text(size=10),panel.grid = element_blank(),axis.title.y = element_blank())+scale_y_continuous(limits = c(min=4.5,max=6.5))
+
+ggarrange(a, b,c,d,  ncol = 2, nrow = 2,font.label = list(size = 14, face = "plain"))
+
+
+ggsave("Chao_Shannon.png",width = 5,height = 5,dpi=300)
